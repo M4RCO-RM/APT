@@ -23,6 +23,8 @@ TOOLS_DIR   = BASE_DIR / "tools"
 APKTOOL     = TOOLS_DIR / "apktool.jar"
 UBER_SIGNER = TOOLS_DIR / "uber-signer.jar"
 KEYSTORE    = TOOLS_DIR / "debug.keystore"
+JAVA_BIN    = TOOLS_DIR / "jdk21" / "bin" / "java"
+KEYTOOL_BIN = TOOLS_DIR / "jdk21" / "bin" / "keytool"
 
 KS_ALIAS    = "debugkey"
 KS_PASS     = "android"
@@ -61,7 +63,7 @@ def ensure_keystore():
         return
     TOOLS_DIR.mkdir(parents=True, exist_ok=True)
     out, err, rc = run([
-        "keytool", "-genkeypair",
+        str(KEYTOOL_BIN), "-genkeypair",
         "-keystore", str(KEYSTORE),
         "-alias",    KS_ALIAS,
         "-keyalg",   "RSA",
@@ -77,7 +79,7 @@ def ensure_keystore():
 
 def apktool_decode(apk_path: Path, out_dir: Path):
     return run([
-        "java", "-jar", str(APKTOOL),
+        str(JAVA_BIN), "-jar", str(APKTOOL),
         "d", str(apk_path),
         "-o", str(out_dir),
         "-f", "--no-src",
@@ -86,7 +88,7 @@ def apktool_decode(apk_path: Path, out_dir: Path):
 
 def apktool_build(decoded_dir: Path, out_apk: Path):
     out, err, rc = run([
-        "java", "-jar", str(APKTOOL),
+        str(JAVA_BIN), "-jar", str(APKTOOL),
         "b", str(decoded_dir),
         "-o", str(out_apk),
         "--use-aapt2",
@@ -94,7 +96,7 @@ def apktool_build(decoded_dir: Path, out_apk: Path):
     if rc != 0:
         # fallback: without aapt2
         out, err, rc = run([
-            "java", "-jar", str(APKTOOL),
+            str(JAVA_BIN), "-jar", str(APKTOOL),
             "b", str(decoded_dir),
             "-o", str(out_apk),
         ], timeout=360)
@@ -105,7 +107,7 @@ def sign_apk(unsigned: Path, out_dir: Path) -> Path:
     ensure_keystore()
     out_dir.mkdir(parents=True, exist_ok=True)
     out, err, rc = run([
-        "java", "-jar", str(UBER_SIGNER),
+        str(JAVA_BIN), "-jar", str(UBER_SIGNER),
         "--apks",      str(unsigned),
         "--out",       str(out_dir),
         "--ks",        str(KEYSTORE),
