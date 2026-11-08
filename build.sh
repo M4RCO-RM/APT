@@ -1,16 +1,29 @@
 #!/usr/bin/env bash
 set -e
 
-echo "▶ Installing Java 21..."
-apt-get update -qq
-apt-get install -y -qq openjdk-21-jre-headless
+# ── Java 21 (Temurin JRE) via direct download — no apt required ──────────────
+JDK_DIR="tools/jdk21"
+mkdir -p tools
+
+if [ ! -f "$JDK_DIR/bin/java" ]; then
+  echo "▶ Downloading JDK 21 (Temurin JRE, x64 Linux)..."
+  curl -sSL \
+    "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jre_x64_linux_hotspot_21.0.5_11.tar.gz" \
+    -o tools/jdk21.tar.gz
+  mkdir -p "$JDK_DIR"
+  tar -xzf tools/jdk21.tar.gz -C "$JDK_DIR" --strip-components=1
+  rm tools/jdk21.tar.gz
+else
+  echo "▶ JDK 21 already present, skipping download."
+fi
+
+export JAVA_HOME="$(pwd)/$JDK_DIR"
+export PATH="$JAVA_HOME/bin:$PATH"
 
 echo "▶ Java version:"
 java -version
 
-echo "▶ Creating tools directory..."
-mkdir -p tools
-
+# ── apktool + uber-apk-signer ─────────────────────────────────────────────────
 echo "▶ Downloading apktool 2.11.1..."
 curl -sSL \
   "https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar" \
@@ -25,9 +38,11 @@ echo "▶ Verifying tools..."
 java -jar tools/apktool.jar --version
 java -jar tools/uber-signer.jar --version
 
+# ── Python deps ───────────────────────────────────────────────────────────────
 echo "▶ Installing Python deps..."
 pip install -r requirements.txt
 
+# ── Debug keystore ────────────────────────────────────────────────────────────
 echo "▶ Generating debug keystore..."
 keytool -genkeypair \
   -keystore tools/debug.keystore \
