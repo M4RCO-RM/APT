@@ -7,4 +7,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: JAVA_HOME
+        value: /opt/render/project/src/tools/jdk21
+      - key: PATH
+        value: /opt/render/project/src/tools/jdk21/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     autoDeploy: true
