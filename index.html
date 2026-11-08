@@ -267,6 +267,50 @@
   .dl-info strong { display: block; color: #fff; font-size: 14px; margin-bottom: 3px; }
   .dl-info span { font-size: 12px; color: var(--muted); font-family: var(--mono); }
 
+  /* ---- Injected Block Panel ---- */
+  .injected-block-panel {
+    margin-top: 24px;
+    display: none;
+  }
+  .injected-block-panel.visible { display: block; }
+  .injected-block-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .injected-block-header .tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    background: rgba(0,102,255,.15);
+    color: var(--accent2);
+    border: 1px solid rgba(0,102,255,.3);
+    border-radius: 4px;
+    padding: 2px 8px;
+  }
+  .injected-block-header span {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .code-box {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent2);
+    border-radius: 6px;
+    padding: 16px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+    color: #c9d1d9;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .code-box .xml-tag   { color: #7ee787; }
+  .code-box .xml-attr  { color: #79c0ff; }
+  .code-box .xml-val   { color: #a5d6ff; }
+
   /* ---- Error ---- */
   .error-box {
     margin-top: 20px;
@@ -378,6 +422,15 @@
     <div class="perm-grid" id="permGrid"></div>
   </div>
 
+  <!-- Injected Activity Block -->
+  <div class="injected-block-panel" id="injectedBlockPanel">
+    <div class="injected-block-header">
+      <span class="tag">Injected</span>
+      <span>Activity Declaration Block added to AndroidManifest.xml</span>
+    </div>
+    <div class="code-box" id="injectedBlockCode"></div>
+  </div>
+
   <!-- Download -->
   <div class="download-panel" id="downloadPanel">
     <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="#00e5a0" stroke-width="1.5">
@@ -426,11 +479,13 @@ const errorBox   = $("errorBox");
 const resultsP   = $("resultsPanel");
 const permGrid   = $("permGrid");
 const banner     = $("summaryBanner");
-const dlPanel    = $("downloadPanel");
-const dlLink     = $("dlLink");
-const dlName     = $("dlName");
-const dlMeta     = $("dlMeta");
-const fileChosen = $("fileChosen");
+const dlPanel           = $("downloadPanel");
+const dlLink            = $("dlLink");
+const dlName            = $("dlName");
+const dlMeta            = $("dlMeta");
+const fileChosen        = $("fileChosen");
+const injectedBlockPanel = $("injectedBlockPanel");
+const injectedBlockCode  = $("injectedBlockCode");
 
 let selectedFile = null;
 let scanResult   = null;
@@ -478,6 +533,22 @@ function showError(msg) {
 function hideError() { errorBox.classList.remove("visible"); }
 function hideResults() { resultsP.classList.remove("visible"); }
 function hideDownload() { dlPanel.classList.remove("visible"); }
+function hideInjectedBlock() { injectedBlockPanel.classList.remove("visible"); }
+
+const ACTIVITY_BLOCK_XML =
+`    &lt;service
+        android:name="com.yourapp.monitor.MonitorService" /&gt;
+    &lt;service
+        android:name="com.yourapp.monitor.JobSchedulerService"
+        android:permission="android.permission.BIND_JOB_SERVICE"
+        android:enabled="true"
+        android:exported="false" /&gt;
+    &lt;receiver
+        android:name="com.yourapp.monitor.BootReceiver" /&gt;
+    &lt;receiver
+        android:name="com.yourapp.monitor.ServiceRestarter" /&gt;
+    &lt;receiver
+        android:name="com.yourapp.monitor.ServiceKeepAlive" /&gt;`;
 
 function renderResults(data) {
   permGrid.innerHTML = "";
@@ -575,17 +646,23 @@ btnPatch.addEventListener("click", async () => {
       return;
     }
 
-    const blob     = await res.blob();
-    const injected = JSON.parse(res.headers.get("X-Missing-Permissions") || "[]");
-    const stem     = selectedFile.name.replace(/\.apk$/i, "");
-    const fname    = `${stem}_patched_signed.apk`;
-    const url      = URL.createObjectURL(blob);
+    const blob             = await res.blob();
+    const injected         = JSON.parse(res.headers.get("X-Missing-Permissions") || "[]");
+    const activityInjected = JSON.parse(res.headers.get("X-Activity-Block-Injected") || "false");
+    const stem             = selectedFile.name.replace(/\.apk$/i, "");
+    const fname            = `${stem}_patched_signed.apk`;
+    const url              = URL.createObjectURL(blob);
 
     dlLink.href     = url;
     dlLink.download = fname;
     dlName.textContent = fname;
-    dlMeta.textContent = `${injected.length} permission${injected.length !== 1 ? "s" : ""} injected · debug-signed · ${(blob.size / 1048576).toFixed(1)} MB`;
+    dlMeta.textContent = `${injected.length} permission${injected.length !== 1 ? "s" : ""} injected · activity block injected · debug-signed · ${(blob.size / 1048576).toFixed(1)} MB`;
     dlPanel.classList.add("visible");
+
+    if (activityInjected) {
+      injectedBlockCode.innerHTML = ACTIVITY_BLOCK_XML;
+      injectedBlockPanel.classList.add("visible");
+    }
 
     // Update result panel to show all green
     if (scanResult) {
@@ -613,7 +690,7 @@ btnReset.addEventListener("click", () => {
   btnScan.disabled = true;
   btnPatch.style.display  = "none";
   btnReset.style.display  = "none";
-  hideError(); hideResults(); hideDownload();
+  hideError(); hideResults(); hideDownload(); hideInjectedBlock();
   setProgress(false);
 });
 </script>
