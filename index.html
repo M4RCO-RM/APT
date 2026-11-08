@@ -530,6 +530,7 @@ btnScan.addEventListener("click", async () => {
 
     if (data.missing.length > 0) {
       btnPatch.style.display = "inline-flex";
+      btnPatch.disabled = false;
     }
     btnReset.style.display = "inline-flex";
   } catch (e) {
