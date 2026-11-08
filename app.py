@@ -92,7 +92,7 @@ def apktool_decode(apk_path: Path, out_dir: Path):
         "d", str(apk_path),
         "-o", str(out_dir),
         "-f",
-    ], timeout=300)
+    ], timeout=480)
 
 
 def apktool_build(decoded_dir: Path, out_apk: Path):
@@ -101,14 +101,14 @@ def apktool_build(decoded_dir: Path, out_apk: Path):
         "b", str(decoded_dir),
         "-o", str(out_apk),
         "--use-aapt2",
-    ], timeout=360)
+    ], timeout=480)
     if rc != 0:
         # fallback: without aapt2
         out, err, rc = run([
             str(JAVA_BIN), "-jar", str(APKTOOL),
             "b", str(decoded_dir),
             "-o", str(out_apk),
-        ], timeout=360)
+        ], timeout=480)
     return out, err, rc
 
 
